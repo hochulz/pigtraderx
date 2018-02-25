@@ -964,13 +964,13 @@ void MainWindow::updateDisc(int gubun)
         ui->lineEdit_21->setText(QString::number(levDisc));
     }
 
-    NAVdiscSum = invDisc +  levDisc;
+    NAVdiscSum = (2 * invDisc +  levDisc) / 3;
     ui->lineEdit_42->setText(QString::number(NAVdiscSum));
 
-    if(NAVdiscSum < -0.30) {
+    if(NAVdiscSum < -0.20) {
         NAVDiscFlag = QChar('D');
     }
-    else if(NAVdiscSum > 0.10) {
+    else if(NAVdiscSum > 0.05) {
         NAVDiscFlag = QChar('P');
     }
     else {
