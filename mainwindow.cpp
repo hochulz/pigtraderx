@@ -357,12 +357,9 @@ void MainWindow::on_checkDisc()
 
     if(NAVDiscFlag == QChar('D') && holdFlag == QChar('F')) {
         if(spread1 == 5 && spread2 == 5) {
-            qDebug() << 1111;
             QPair<int, int> temp = getBuyQty(mStock->askPrice1, mStock->askVolume1, mStock_2->askPrice1, mStock_2->askVolume1, seed);
-            qDebug() << 2222;
             int qty1 = temp.first;
             int qty2 = temp.second;
-            qDebug() << 3333;
 
             mCpTd0311->SetInputValue(0, QStringLiteral("2"));
 //            mCpTd0311->SetInputValue(1, mAccNo);
@@ -372,9 +369,7 @@ void MainWindow::on_checkDisc()
 //            mCpTd0311->SetInputValue(5, 0);
 //            mCpTd0311->SetInputValue(7, QStringLiteral("0"));
 //            mCpTd0311->SetInputValue(8, QStringLiteral("03"));
-            qDebug() << 4444;
             mCpTd0311->Request();
-            qDebug() << 5555;
 
             mCpTd0311_2->SetInputValue(0, QStringLiteral("2"));
 //            mCpTd0311_2->SetInputValue(1, mAccNo);
@@ -967,7 +962,7 @@ void MainWindow::updateDisc(int gubun)
     NAVdiscSum = (2 * invDisc +  levDisc) / 3;
     ui->lineEdit_42->setText(QString::number(NAVdiscSum));
 
-    if(NAVdiscSum < -0.20) {
+    if(NAVdiscSum < -0.10) {
         NAVDiscFlag = QChar('D');
     }
     else if(NAVdiscSum > 0.05) {
