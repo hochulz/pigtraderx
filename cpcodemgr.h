@@ -23,6 +23,12 @@ public:
         return ret;
     }
 
+    int GetStockYdClosePrice(const QString &code)
+    {
+        int ret = dynamicCall("GetStockYdClosePrice(QString)", code).toInt();
+        return ret;
+    }
+
 };
 
 #endif // CPCODEMGR_H

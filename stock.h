@@ -23,6 +23,7 @@ public:
     int bidVolume2;
 
     float midPrice;
+    int YDClosePrice;
 
 //    float trackingIdx;
 //    float trackingErr;

@@ -50,6 +50,8 @@ MainWindow::MainWindow(QWidget *parent) :
     mCode_2 = QStringLiteral("A233740"); //레버리지
     mStock = new Stock(mCode); //인버스
     mStock_2 = new Stock(mCode_2); //레버리지
+    mStock->YDClosePrice = mCpCodeMgr->GetStockYdClosePrice(mCode);
+    mStock_2->YDClosePrice = mCpCodeMgr->GetStockYdClosePrice(mCode_2);
 
     ui->lineEdit->setText(mStock->strCode);
     ui->lineEdit_16->setText(mStock_2->strCode);
@@ -105,16 +107,20 @@ MainWindow::MainWindow(QWidget *parent) :
 
     // 기본세팅 초기화
 //    discFlag = QChar('N');
-    marketFlag = QChar('F');
+    marketFlag = 0;
 //    holdFlag = QChar('F');
 //    ui->lineEdit_38->setText(holdFlag);
-    ui->lineEdit_39->setText(marketFlag);
+    ui->lineEdit_39->setText(QString::number(marketFlag));
 
     //타이머 설정
     timer = new QTimer(this);
     timer->setTimerType(Qt::PreciseTimer);
-    connect(timer, QTimer::timeout, this, &MainWindow::on_checkDisc);
+    connect(timer, QTimer::timeout, this, &MainWindow::on_timeout);
 
+    timer_2 = new QTimer(this);
+    timer_2->setTimerType(Qt::PreciseTimer);
+    timer_2->setSingleShot(true);
+    connect(timer_2, QTimer::timeout, this, &MainWindow::on_timeout_2);
 
     //ETF 현재가조회 (CpSvr7244)
 //    connect(mCpSvr7244, SIGNAL(Received()), this, SLOT(received_CpSvr7244()));
@@ -142,10 +148,19 @@ MainWindow::MainWindow(QWidget *parent) :
 //    connect(mETF, &ETF::invNAVReady, this, &MainWindow::on_invNAVReady_received);
 //    ETFThread.start();
 
-    levPDFFutureName = QStringLiteral("코스닥150 F 201803");
-    levPDFFutureCode = QStringLiteral("106N3");
+    levPDFFutureName = QStringLiteral("코스닥150 F 201806");
+    levPDFFutureName_2 = QStringLiteral("코스닥150 F 201803");
+    levPDFFutureCode = QStringLiteral("106N6");
+    levPDFFutureCode_2 = QStringLiteral("106N3");
+    levPDFFutureQty = 0;
+    levPDFFutureQty_2 = 0;
     invPDFFutureName = levPDFFutureName;
+    invPDFFutureName_2 = levPDFFutureName_2;
     invPDFFutureCode = levPDFFutureCode;
+    invPDFFutureCode_2 = levPDFFutureCode_2;
+    invPDFFutureQty = levPDFFutureQty;
+    invPDFFutureQty_2 = levPDFFutureQty_2;
+
 
     QStringList KospiCodeList = mCpCodeMgr->GetStockListByMarket(1);
     QStringList KosdaqCodeList = mCpCodeMgr->GetStockListByMarket(2);
@@ -181,6 +196,10 @@ MainWindow::MainWindow(QWidget *parent) :
             if(item.at(0) == levPDFFutureName) {
                 levPDFFutureQty = item.at(1).toDouble();
                 qDebug() << levPDFFutureName;
+            }
+            else if(item.at(0) == levPDFFutureName_2) {
+                levPDFFutureQty_2 = item.at(1).toDouble();
+                qDebug() << levPDFFutureName_2;
             }
             else if(item.at(0) == QStringLiteral("원화현금")) {
                 levPDFCash = item.at(3).toLongLong();
@@ -231,6 +250,9 @@ MainWindow::MainWindow(QWidget *parent) :
             if(item.at(0) == invPDFFutureName) {
                 invPDFFutureQty = item.at(1).toDouble();
             }
+            else if(item.at(0) == invPDFFutureName_2) {
+                invPDFFutureQty_2 = item.at(1).toDouble();
+            }
             else if(item.at(0) == QStringLiteral("원화현금")) {
                 invPDFCash = item.at(3).toLongLong();
                 invBalance = invPDFCash;
@@ -278,6 +300,10 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(mFutureMst, SIGNAL(Received()), this, SLOT(received_FutureMst()));
     mFutureMst->SetInputValue(0, levPDFFutureCode);
     mFutureMst->BlockRequest();
+    if(levPDFFutureQty_2 != 0) {
+        mFutureMst->SetInputValue(0, levPDFFutureCode_2);
+        mFutureMst->BlockRequest();
+    }
 
     //실시간 시세 (StockCur)
     connect(mStockCur, SIGNAL(Received()), this, SLOT(received_StockCur()));
@@ -301,11 +327,15 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(mFutureCurOnly, SIGNAL(Received()), this, SLOT(received_FutureCurOnly()));
     mFutureCurOnly->SetInputValue(0, levPDFFutureCode);
     mFutureCurOnly->Subscribe();
+    if(levPDFFutureQty_2 != 0) {
+        mFutureCurOnly->SetInputValue(0, levPDFFutureCode_2);
+        mFutureCurOnly->Subscribe();
+    }
 
     //주식선물 종목
-    levPDFSFutureCode << QStringLiteral("1CPN3000");
-    levPDFSFutureName << QStringLiteral("셀트리온   F 201803 (  10)");
-    levPDFSFutureQty << -2.98;
+    levPDFSFutureCode << QStringLiteral("1CPN4000");
+    levPDFSFutureName << QStringLiteral("셀트리온   F 201804 (  10)");
+    levPDFSFutureQty << -2.73;
     levPDFSFuturekBalance << 0;
 
     kiwoom->SetInputValue(QStringLiteral("근월물구분"), QStringLiteral("1"));
@@ -346,11 +376,13 @@ void MainWindow::on_pushButton_clicked() //Status
 
 void MainWindow::on_pushButton_2_clicked() //Test
 {
-//    timer->start(500);
-    mCpTd6033->Request();
+    timer->start(500);
+//    mCpTd6033->Request();
+    int temp = mCpCodeMgr->GetStockYdClosePrice(mCode);
+    qDebug() << temp;
 }
 
-void MainWindow::on_checkDisc()
+void MainWindow::on_timeout()
 {
     int spread1 = mStock->askPrice1 - mStock->bidPrice1;
     int spread2 = mStock_2->askPrice1 - mStock_2->bidPrice1;
@@ -422,6 +454,11 @@ void MainWindow::on_checkDisc()
 
 }
 
+void MainWindow::on_timeout_2()
+{
+    timer->start(500);
+}
+
 void MainWindow::received_StockMst2()
 {
     int count = mStockMst2->GetHeaderValue(0).toInt();
@@ -474,15 +511,28 @@ void MainWindow::received_StockMst2()
 void MainWindow::received_FutureMst()
 {
     float increase= mFutureMst->GetHeaderValue(77).toFloat();
-    qDebug() << "선물전일대비:" << increase;
+    QString fCode = mFutureMst->GetHeaderValue(0).toString();
 
-    levPDFFutureBalance = increase * levPDFFutureQty * 10000;
-    levBalance +=  levPDFFutureBalance;
-    levNAV = levBalance / 100000.0;
+    if(fCode == levPDFFutureCode) {
+        levPDFFutureBalance = increase * levPDFFutureQty * 10000;
+        levBalance +=  levPDFFutureBalance;
+        levNAV = levBalance / 100000.0;
 
-    invPDFFutureBalance = increase * invPDFFutureQty * 10000;
-    invBalance +=  invPDFFutureBalance;
-    invNAV = invBalance / 100000.0;
+        invPDFFutureBalance = increase * invPDFFutureQty * 10000;
+        invBalance +=  invPDFFutureBalance;
+        invNAV = invBalance / 100000.0;
+    }
+
+    else if(fCode == levPDFFutureCode_2) {
+        levPDFFutureBalance_2 = increase * levPDFFutureQty_2 * 10000;
+        levBalance +=  levPDFFutureBalance_2;
+        levNAV = levBalance / 100000.0;
+
+        invPDFFutureBalance_2 = increase * invPDFFutureQty_2 * 10000;
+        invBalance +=  invPDFFutureBalance_2;
+        invNAV = invBalance / 100000.0;
+    }
+
 
     updateDisc(0);
     displayNAV(0);
@@ -534,17 +584,31 @@ void MainWindow::received_StockCur()
 
 void MainWindow::received_FutureCurOnly()
 {
+    QString fCode = mFutureCurOnly->GetHeaderValue(0).toString();
     float increase = mFutureCurOnly->GetHeaderValue(2).toFloat();
 
-    levBalance = levBalance - levPDFFutureBalance;
-    levPDFFutureBalance = increase * levPDFFutureQty * 10000;
-    levBalance +=  levPDFFutureBalance;
-    levNAV = levBalance / 100000.0;
+    if(fCode == levPDFFutureCode) {
+        levBalance = levBalance - levPDFFutureBalance;
+        levPDFFutureBalance = increase * levPDFFutureQty * 10000;
+        levBalance +=  levPDFFutureBalance;
+        levNAV = levBalance / 100000.0;
 
-    invBalance = invBalance - invPDFFutureBalance;
-    invPDFFutureBalance = increase * invPDFFutureQty * 10000;
-    invBalance +=  invPDFFutureBalance;
-    invNAV = invBalance / 100000.0;
+        invBalance = invBalance - invPDFFutureBalance;
+        invPDFFutureBalance = increase * invPDFFutureQty * 10000;
+        invBalance +=  invPDFFutureBalance;
+        invNAV = invBalance / 100000.0;
+    }
+    else if(fCode == levPDFFutureCode_2) {
+        levBalance = levBalance - levPDFFutureBalance_2;
+        levPDFFutureBalance_2 = increase * levPDFFutureQty_2 * 10000;
+        levBalance +=  levPDFFutureBalance_2;
+        levNAV = levBalance / 100000.0;
+
+        invBalance = invBalance - invPDFFutureBalance_2;
+        invPDFFutureBalance_2 = increase * invPDFFutureQty_2 * 10000;
+        invBalance +=  invPDFFutureBalance_2;
+        invNAV = invBalance / 100000.0;
+    }
 
     updateDisc(0);
     displayNAV(0);
@@ -677,7 +741,7 @@ void MainWindow::received_StockJpBid()
 //    }
 
 
-//    if (MarketFlag == "T" && HoldFlag == "F" && NAVdiscSum < -0.2) {
+//    if (MarketFlag == 2 && HoldFlag == "F" && NAVdiscSum < -0.2) {
 //        qDebug() << "Buy" << mStock->askPrice1 << mStock->askVolume1 << mStock_2->askPrice1 << mStock_2->askVolume1;
 //        HoldFlag = 'T';
 //        ui->lineEdit_38->setText(HoldFlag);
@@ -735,7 +799,6 @@ void MainWindow::received_CpTd6033()
 
 void MainWindow::received_CpConclusion()
 {
-    qDebug() << 6666;
 
     int sGubun = mCpConclusion ->GetHeaderValue(14).toInt();
     QString sCode = mCpConclusion ->GetHeaderValue(9).toString();
@@ -747,6 +810,9 @@ void MainWindow::received_CpConclusion()
         case 1 : //체결
             qDebug() << QStringLiteral("체결되었습니다") << price << qty;
             if(sOrderGubun == QStringLiteral("1")) { //매도
+                seed += qty * price;
+
+
                 if(sCode == mCode) {
                     mStock->qty -= qty;
                     ui->lineEdit_2->setText(QString::number(mStock->qty));
@@ -757,6 +823,9 @@ void MainWindow::received_CpConclusion()
                 }
             }
             else if(sOrderGubun == QStringLiteral("2")) { //매수
+                seed -= qty * price;
+
+
                 if(sCode == mCode) {
                     mStock->qty += qty;
                     ui->lineEdit_2->setText(QString::number(mStock->qty));
@@ -766,6 +835,16 @@ void MainWindow::received_CpConclusion()
                     ui->lineEdit_17->setText(QString::number(mStock_2->qty));
                 }
             }
+
+            if(seed < 100000) {
+                holdFlag = QChar('T');
+            }
+            else {
+                holdFlag = QChar('F');
+            }
+            ui->lineEdit_37->setText(QString::number(seed));
+            ui->lineEdit_38->setText(holdFlag);
+
             break;
 
         case 2 : //확인
@@ -783,7 +862,7 @@ void MainWindow::received_CpConclusion()
     }
 //    mCpTdNew5331A->SetInputValue(0, mAccNo);
 //    mCpTdNew5331A->SetInputValue(1, mGoodCode);
-    mCpTdNew5331A->Request();
+//    mCpTdNew5331A->Request();
 
 }
 
@@ -906,23 +985,29 @@ void MainWindow::on_real_data_received(const QString &sCode, const QString &sRea
         }
         else if(market_hour_flag == QStringLiteral("3"))
         {
-            marketFlag = 'T';
-            ui->lineEdit_39->setText(marketFlag);
+            marketFlag = 1;
+            ui->lineEdit_39->setText(QString::number(marketFlag));
             qDebug() << QStringLiteral("장시작");
-            timer->start(500);
+            timer_2->start(60000);
         }
         else if(market_hour_flag == QStringLiteral("2"))
         {
             if(min_remain == QStringLiteral("001000")) {
-                marketFlag = 'F';
-                ui->lineEdit_39->setText(marketFlag);
+                marketFlag = 3;
+                ui->lineEdit_39->setText(QString::number(marketFlag));
                 qDebug() << "장종료 10분전";
                 timer->stop();
+
+                //여기서 미체결확인 후 취소처리
 
             }
         }
         else if(market_hour_flag == QStringLiteral("4"))
         {
+            marketFlag = 0;
+            ui->lineEdit_39->setText(QString::number(marketFlag));
+            qDebug() << "장종료";
+
 
         }
     }
@@ -982,26 +1067,29 @@ QPair<int, int> MainWindow::getBuyQty(int askp1, int askv1, int askp2, int askv2
     int buyQty1 = cash1 / askp1;
     int buyQty2 = cash2 / askp2;
 
+    float f1 = (float)askp1 / mStock->YDClosePrice;
+    float f2 = (float)askp2 / mStock_2->YDClosePrice;
+
     QPair<int, int> res;
 
     if(buyQty1 <= askv1 && buyQty2 <= askv2) {
-        res.first = buyQty1;
-        res.second = buyQty2;
+        res.first = buyQty1 * f1;
+        res.second = buyQty2 * f2;
 
     }
     else if(buyQty1 <= askv1) {
         buyQty2 = askv2;
         long long temp = buyQty2 * askp2 * 2;
         buyQty1 = temp / askp1;
-        res.first = buyQty1;
-        res.second = buyQty2;
+        res.first = buyQty1 * f1;
+        res.second = buyQty2 * f2;
     }
     else if(buyQty2 <= askv2) {
         buyQty1 = askv1;
         long long temp = buyQty1 * askp1 / 2;
         buyQty2 = temp / askp2;
-        res.first = buyQty1;
-        res.second = buyQty2;
+        res.first = buyQty1 * f1;
+        res.second = buyQty2 * f2;
 
     }
     return res;

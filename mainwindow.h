@@ -53,7 +53,8 @@ public:
     CpTd0311 *mCpTd0311_2;
 
     Kiwoom *kiwoom;
-    QTimer *timer;
+    QTimer *timer; //NAV 체크용
+    QTimer *timer_2; //장초반 거래제한용
 //    int timer_intv;
 
     QString mCode; //인버스
@@ -70,8 +71,9 @@ public:
 
     double NAVdiscSum;
 
+    // flag 모음
     QChar NAVDiscFlag; // D: discount P: premium N: neutral
-    QChar marketFlag; // T: open F: close
+    int marketFlag; // 0: 장마감 1: 9:00 ~ 9:01 2: 9:01~15:20 3: 15:20~15:30
     QChar holdFlag; // T F
 
 //    QThread ETFThread;
@@ -87,6 +89,11 @@ public:
     QString levPDFFutureName;
     double levPDFFutureQty;
     long long levPDFFutureBalance;
+
+    QString levPDFFutureCode_2;
+    QString levPDFFutureName_2;
+    double levPDFFutureQty_2;
+    long long levPDFFutureBalance_2;
 
     QVector<QString> levPDFStockCode;
     QVector<QString> levPDFStockName;
@@ -109,6 +116,11 @@ public:
     double invPDFFutureQty;
     long long invPDFFutureBalance;
 
+    QString invPDFFutureCode_2;
+    QString invPDFFutureName_2;
+    double invPDFFutureQty_2;
+    long long invPDFFutureBalance_2;
+
     long long invBalance;
     double invNAV;
     double invDisc;
@@ -123,7 +135,7 @@ public:
 private slots:
     void on_pushButton_clicked();
     void on_pushButton_2_clicked();
-    void on_checkDisc();
+
 
     void received_StockMst2();
     void received_FutureMst();
@@ -147,7 +159,8 @@ private slots:
     void on_tr_data_received(const QString &sScrNo, const QString &sRQName, const QString &sTrCode, const QString &sRecordName, const QString &sPrevNext, int nDataLengt, const QString &sErrorCode, const QString &sMessage, const QString &sSplMsg);
     void on_real_data_received(const QString &sCode, const QString &sRealType, const QString &sRealData);
 
-//    void on_timeout();
+    void on_timeout();
+    void on_timeout_2();
 
 private:
     Ui::MainWindow *ui;
